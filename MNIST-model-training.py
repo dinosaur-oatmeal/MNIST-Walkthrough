@@ -13,14 +13,26 @@ def load_mnist():
     x = x.to_numpy().reshape(-1, 28 * 28).astype(np.float32) / 255.0
     y = y.astype(int)
 
+    # Shuffle the dataset before splitting
+    np.random.seed(42)
+    #permutation = np.random.permutation(x.shape[0])
+    #x, y = x[permutation], y[permutation]
 
-    # Manually split data into training and testing sets
-    x_train, x_test = x[:60000].T, x[60000:].T # Transpose to make (784, 60000)
+    # Split data into training and testing sets
+    x_train, x_test = x[:60000].T, x[60000:].T  # Shape: (784, 60000) and (784, 10000)
     y_train, y_test = y[:60000], y[60000:]
+
+    # Verification of shapes
+    '''
+    print(f"x shape: {x.shape}")
+    print(f"y shape: {y.shape}")
+    print(f"x_train shape: {x_train.shape}, x_test shape: {x_test.shape}")
+    print(f"y_train shape: {y_train.shape}, y_test shape: {y_test.shape}")
+    '''
 
     return x_train, y_train, x_test, y_test
 
-# Initializes weights matrix and baises vectors
+# Initializes weights matrices and baises vectors
 def initialize_parameters(input_size, hidden_size, output_size):
     # Random initialization of weights for input-to-hidden and hidden-to-output layers
     np.random.seed(42)
@@ -33,8 +45,8 @@ def initialize_parameters(input_size, hidden_size, output_size):
     A column corresponds to all weights coming out of a particular neuron in first layer
     '''
     weights = {
-        'w1': np.random.randn(hidden_size, input_size) * np.sqrt(2 / input_size),  # Weight matrix from input to hidden
-        'w2': np.random.randn(output_size, hidden_size) * np.sqrt(2 / input_size)  # Weight matrix from hidden to output
+        'w1': np.random.randn(hidden_size, input_size) * np.sqrt(1. / input_size),  # Weight matrix from input to hidden
+        'w2': np.random.randn(output_size, hidden_size) * np.sqrt(1. / hidden_size) # Weight matrix from hidden to output
     }
 
     '''
@@ -55,6 +67,13 @@ def sigmoid(z):
     return 1 / (1 + np.exp(-z))
 
 '''
+Sigmoid derivative (demonstrate math behind it)
+Squishes data to be between 0 and 1 for calculations
+'''
+def sigmoid_derivative(a):
+    return a * (1 - a)
+
+'''
 Transform raw scores into probabilities that sum to 1
 softmax(z_j) = \frac{ e^{z_j} } { \sum_{k=1}^n * e^{z_k} }
 '''
@@ -66,7 +85,7 @@ def softmax(z):
     exp_z = np.exp(z - np.max(z, axis=0, keepdims=True))
 
     # return probability distribution over the classes
-    return exp_z / exp_z.sum(axis=0, keepdims=True)
+    return exp_z / np.sum(exp_z, axis=0, keepdims=True)
 
 '''
 Calculate the loss during training
@@ -90,7 +109,7 @@ Returns:
     loss -- cross-entropy loss
 '''
 def compute_loss(a2, y):
-    
+
     # Number of samples
     m = y.shape[0]
 
@@ -106,8 +125,8 @@ def compute_loss(a2, y):
         j is the index of the correct class (true label)
     Then, find the average over batch
     '''
-    log_probability = -np.log(a2_clipped[y, np.arange(m)]) # Log of correct class probability
-    loss = np.sum(log_probability) / m              # Average loss across all samples
+    log_probability = -np.log(a2_clipped[y, np.arange(m)])    # Log of correct class probability
+    loss = np.sum(log_probability) / m                        # Average loss across all samples
 
     return loss
 
@@ -120,7 +139,7 @@ Take input data and pass through network to compute output and intermediate valu
     Input Layer -> Hidden Layer (Sigmoid activation) -> Output Layer (Softmax activation)
 
 Arguments:
-    x -- input data (shape: input_size, number_of_samples)
+    x -- input data (shape: number_of_samples, input_size)
     weights -- dictionary containing the current weights w1 (input -> hidden) and w2 (hidden -> output)
     biases -- dictionary containing the current biases b1 (hidden) and b2 (output)
 
@@ -129,13 +148,16 @@ Returns:
     cache -- dictionary containing z1, a1, z2, a2 needed for backpropagation
 '''
 def forward_propagation(x, weights, biases):
+
     # z1 is the pre-activation values for the hidden layer
     z1 = np.dot(weights['w1'], x) + biases['b1']
-    # a1 is the sigmoid activation for the hidden layer (squishes z1 between 0 and 1)
+
+    # a1 is the Sigmoid activation for the hidden layer (squishes z1 between 0 and 1)
     a1 = sigmoid(z1)
 
     # z2 is the pre-activation values for the output layer
     z2 = np.dot(weights['w2'], a1) + biases['b2']
+
     # a2 is the softmax activation for the output layer (probability distribution function)
     a2 = softmax(z2)
 
@@ -145,6 +167,7 @@ def forward_propagation(x, weights, biases):
         'z2' : z2,
         'a2' : a2
     }
+
     return a2, cache
 
 '''
@@ -176,7 +199,7 @@ Gradients
         b is bias vector
 
 Arguments:
-    x -- input data (shape: input_size, number_of_samples)
+    x -- input data (shape: number_of_samples, input_size)
     y -- true labels (shape: number_of_samples,)
     cache -- dictionary containing z1, a1, z2, a2 (from forward propagation)
     weights -- dictionary containing w1 and w2
@@ -187,17 +210,15 @@ Returns:
 def back_propagation(x, y, cache, weights):
 
     # Number of samples
-    m = x.shape[1]
+    m = y.shape[0]
 
     '''
     Retrieve cached values from forward propagation
-        z1: pre-activation values at hidden layer: weighted sum of input + bias before applying sigmoid
         a1: activations at hidden layer (after applying sigmoid)
             These become the input for the next layer (output)
-        z2: pre-activation values at the output layer (raw logits before applying Softmax)
         a2: activations at output layer (probability distribution over classes)
     '''
-    z1, a1, z2, a2 = cache['z1'], cache['a1'], cache['z2'], cache['a2']
+    a1, a2 = cache['a1'], cache['a2']
 
     '''
     One-hot encode labels to be compatible with function
@@ -219,15 +240,14 @@ def back_propagation(x, y, cache, weights):
     db2 = np.sum(dz2, axis=1, keepdims=True) / m # Gradient of biases (summation of errors for each output) / m
 
     # Step 3: Backpropagate the error to the hidden layer
-    da1 = np.dot(weights['w2'].T, dz2) / m # Error at hidden layer before applying sigmoid derivative
+    da1 = np.dot(weights['w2'].T, dz2)  # Error at hidden layer before applying Sigmoid derivative
 
-    # no
     # Step 4: Sigmoid derivative to the error at the hidden layer
-    dz1 = da1 * a1 * (1 - a1) # Sigmoid Derivative: a1 * (1 - a1)
+    dz1 = da1 * sigmoid_derivative(cache['a1'])
 
     # Step 5: Gradient of weights and biases for hidden layer
-    dw1 = np.dot(dz1, x.T) / m # Gradient loss with respect to weights connecting the input layer to hidden layer
-    db1 = np.sum(dz1, axis=1, keepdims=True) / m # Graident biases between input layer and hidden layer
+    dw1 = np.dot(dz1, x.T) / m  # Gradient loss with respect to weights connecting the input layer to hidden layer
+    db1 = np.sum(dz1, axis=1, keepdims=True) / m    # Graident biases between input layer and hidden layer
 
     # Store gradients in a dictionary for later use
     gradients = {
@@ -259,14 +279,50 @@ Returns:
 def update_parameters(weights, biases, gradients, learning_rate):
 
     # Update weights
-    weights['w1'] = weights['w1'] - learning_rate * gradients['dw1']
-    weights['w2'] = weights['w2'] - learning_rate * gradients['dw2']
+    weights['w1'] -= learning_rate * gradients['dw1']
+    weights['w2'] -= learning_rate * gradients['dw2']
 
     # Update biases
-    biases['b1'] = biases['b1'] - learning_rate * gradients['db1']
-    biases['b2'] = biases['b2'] - learning_rate * gradients['db2']
-
+    biases['b1']  -= learning_rate * gradients['db1']
+    biases['b2']  -= learning_rate * gradients['db2']
     return weights, biases
+
+'''
+Makes predictions based on the current state of the neural network
+
+Arguments:
+    x -- input data (shape: number_of_samples, input_size)
+    weights -- dictionary containing the current weights w1 and w2
+    biases -- dictionary containing the current biases b1 and b2
+
+Returns:
+    predictions -- array containing predicted labels for each input
+
+'''
+def predict(x, weights, biases):
+
+    # Calculate output activations
+    a2, _ = forward_propagation(x, weights, biases)
+
+    # Array containing predicted labels for each input sample
+    predictions = np.argmax(a2, axis=0)
+
+    return predictions
+
+'''
+Computes the accuracy of predictions by comparing the predicted labels with the true labels
+
+Arguments:
+    y_true -- array containing the true labels for each input sample
+    y_pred -- array containing the predicted labels for each input sample
+
+Returns:
+    fraction of correct predictions by finding the mean of a boolean array * 100
+'''
+def compute_accuracy(y_true, y_pred):
+
+    # Fraction of correct predictions
+    return np.mean(y_true == y_pred) * 100
 
 '''
 Training the neural network using gradient descent
@@ -288,8 +344,8 @@ Returns:
 def train_neural_network(x_train, y_train, weights, biases, learning_rate, num_epochs):
 
     # Loop through updates to weights and biases for each epoch
-    for epoch in range(num_epochs):
-        
+    for epoch in range(1, num_epochs + 1):
+
         # Step 1: Forward propagation
         a2, cache = forward_propagation(x_train, weights, biases)
 
@@ -302,10 +358,14 @@ def train_neural_network(x_train, y_train, weights, biases, learning_rate, num_e
         # Step 4: Update weights and biases using gradient descent
         weights, biases = update_parameters(weights, biases, gradients, learning_rate)
 
-        # Print loss every 50 epochs to track progress
+        # Compute training accuracy during training
+        y_pred_train = np.argmax(a2, axis=0)
+        accuracy_train = compute_accuracy(y_train, y_pred_train)
+
+        # Print loss every 10 epochs to track progress
         if epoch % 10 == 0:
-            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss}")
-    
+            print(f"Epoch {epoch}/{num_epochs} - Loss: {loss:.4f} - Training Accuracy: {accuracy_train:.2f}%")
+
     return weights, biases
 
 '''
@@ -316,27 +376,29 @@ Arguments:
     y_test -- true labels to test
     weights -- dictionary containing the initial weights w1 and w2
     biases -- dictionary containing the initial biases b1 and b2
+
+Returns:
+    accuracy -- percentage of how accurate the model is
 '''
 def evaluate_model(x_test, y_test, weights, biases):
-    # Perform forward propagation on the test data
-    a2, _ = forward_propagation(x_test, weights, biases)
 
-    # Get predicted labels by finding the index of the highest probability in a2
-    y_pred = np.argmax(a2, axis=0)
+    # Find predictions on the test data
+    predictions = predict(x_test, weights, biases)
 
     # Calculate accuracy by comparing predicted labels to true labels
-    accuracy = np.mean(y_pred == y_test)
+    accuracy = compute_accuracy(y_test, predictions)
 
     return accuracy
 
 def main():
+    
     # Step 1: Load the MNIST dataset
     x_train, y_train, x_test, y_test = load_mnist()
 
     # Step 2: Initialize parameters
-    input_size = 28 * 28  # Each image is 28x28 pixels
-    hidden_size = 256     # Number of neurons in the hidden layer
-    output_size = 10      # 10 output neurons for the 10 digits (0-9)
+    input_size = x_train.shape[0]   # Each image is 28x28 pixels = 784
+    hidden_size = 256               # Number of neurons in the hidden layer
+    output_size = 10                # 10 output neurons for the 10 digits (0-9)
 
     weights, biases = initialize_parameters(input_size, hidden_size, output_size)
 
@@ -349,7 +411,7 @@ def main():
 
     # Step 5: Evaluate the model
     test_accuracy = evaluate_model(x_test, y_test, weights, biases)
-    print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+    print(f"\nTest Accuracy: {test_accuracy:.2f}%")
 
 if __name__ == "__main__":
     main()
