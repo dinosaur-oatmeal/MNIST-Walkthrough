@@ -85,7 +85,7 @@ def softmax(z):
     exp_z = np.exp(z - np.max(z, axis=0, keepdims=True))
 
     # return probability distribution over the classes
-    return exp_z / np.sum(exp_z, axis=0, keepdims=True)
+    return exp_z / exp_z.sum(axis=0, keepdims=True)
 
 '''
 Calculate the loss during training
@@ -363,7 +363,7 @@ def train_neural_network(x_train, y_train, weights, biases, learning_rate, num_e
         accuracy_train = compute_accuracy(y_train, y_pred_train)
 
         # Print loss every 10 epochs to track progress
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
             print(f"Epoch {epoch}/{num_epochs} - Loss: {loss:.4f} - Training Accuracy: {accuracy_train:.2f}%")
 
     return weights, biases
@@ -397,14 +397,14 @@ def main():
 
     # Step 2: Initialize parameters
     input_size = x_train.shape[0]   # Each image is 28x28 pixels = 784
-    hidden_size = 16                # Number of neurons in the hidden layer
+    hidden_size = 128                # Number of neurons in the hidden layer
     output_size = 10                # 10 output neurons for the 10 digits (0-9)
 
     weights, biases = initialize_parameters(input_size, hidden_size, output_size)
 
     # Step 3: Set hyperparameters
     learning_rate = 0.1  # Small step size for gradient descent
-    num_epochs = 100     # Number of training epochs
+    num_epochs = 10     # Number of training epochs
 
     # Step 4: Train the neural network
     weights, biases = train_neural_network(x_train, y_train, weights, biases, learning_rate, num_epochs)
