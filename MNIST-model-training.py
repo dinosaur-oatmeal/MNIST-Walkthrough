@@ -79,7 +79,7 @@ softmax(z_j) = \frac{ e^{z_j} } { \sum_{k=1}^n * e^{z_k} }
 '''
 def softmax(z):
     '''
-    subtract max value from z to ensure that the largest value in z bexomes 0
+    subtract max value from z to ensure that the largest value in z becomes 0
         prevents large exponentials from occuring while preserving relative differences
     '''
     exp_z = np.exp(z - np.max(z, axis=0, keepdims=True))
@@ -144,7 +144,7 @@ Arguments:
     biases -- dictionary containing the current biases b1 (hidden) and b2 (output)
 
 Returns:
-    a2: activations at output layer (probability distribution over classes)
+    a2 -- activations at output layer (probability distribution over classes)
     cache -- dictionary containing z1, a1, z2, a2 needed for backpropagation
 '''
 def forward_propagation(x, weights, biases):
@@ -397,7 +397,7 @@ def main():
 
     # Step 2: Initialize parameters
     input_size = x_train.shape[0]   # Each image is 28x28 pixels = 784
-    hidden_size = 256               # Number of neurons in the hidden layer
+    hidden_size = 16                # Number of neurons in the hidden layer
     output_size = 10                # 10 output neurons for the 10 digits (0-9)
 
     weights, biases = initialize_parameters(input_size, hidden_size, output_size)
