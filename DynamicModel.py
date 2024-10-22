@@ -74,7 +74,7 @@ def compute_loss(aL, y):
     return loss
 
 # Forward propagation
-def forward_propagation(x, weights, biases, activation_func):
+def forward_propagation(x, weights, biases):
 
     activations = [x]
     zs = []
@@ -84,7 +84,7 @@ def forward_propagation(x, weights, biases, activation_func):
         z = np.dot(weights[i], activations[-1]) + biases[i]
         zs.append(z)
 
-        a = activation_func(z)
+        a = relu(z)
         activations.append(a)
 
     z = np.dot(weights[-1], activations[-1]) + biases[-1]
@@ -97,7 +97,7 @@ def forward_propagation(x, weights, biases, activation_func):
     return activations[-1], cache
 
 # Backward propagation
-def back_propagation(y, cache, weights, activation_derivative):
+def back_propagation(y, cache, weights):
 
     m = y.shape[0]
     activations = cache['activations']
@@ -117,7 +117,7 @@ def back_propagation(y, cache, weights, activation_derivative):
 
     for l in range(len(weights) - 2, -1, -1):
 
-        delta = np.dot(weights[l + 1].T, delta) * activation_derivative(activations[l + 1])
+        delta = np.dot(weights[l + 1].T, delta) * relu_derivative(activations[l + 1])
 
         dw = np.dot(delta, activations[l].T) / m
         db = np.sum(delta, axis=1, keepdims=True) / m
@@ -139,38 +139,71 @@ def update_parameters(weights, biases, gradients, learning_rate):
 
     return weights, biases
 
+def predict(x, weights, biases):
+    
+    # Calculate output activations
+    a2, _ = forward_propagation(x, weights, biases)
+
+    # Array containing predicted labels for each input sample
+    predictions = np.argmax(a2, axis=0)
+
+    return predictions
+
+def compute_accuracy(y_true, y_pred):
+    
+    return np.mean(y_true == y_pred) * 100
+
 # Train Neural Network
-def train_neural_network(x_train, y_train, weights, biases, learning_rate, num_epochs,
-                         activation_func, activation_derivative, batch_size=64):
+def train_neural_network(x_train, y_train, weights, biases, learning_rate, num_epochs, batch_size, x_val=None, y_val=None):
     
     m = x_train.shape[1]
+    loss_history = []
+    accuracy_history = []
 
     for epoch in range(1, num_epochs + 1):
+        # Shuffle the training data
+        permutation = np.random.permutation(m)
+        x_train_shuffled = x_train[:, permutation]
+        y_train_shuffled = y_train[permutation]
 
         for i in range(0, m, batch_size):
+            x_batch = x_train_shuffled[:, i:i+batch_size]
+            y_batch = y_train_shuffled[i:i+batch_size]
 
-            x_batch = x_train[:, i:i+batch_size]
-            y_batch = y_train[i:i+batch_size]
+            # Forward propagation
+            aL, cache = forward_propagation(x_batch, weights, biases)
 
-            aL, cache = forward_propagation(x_batch, weights, biases, activation_func)
+            # Backward propagation
+            gradients = back_propagation(y_batch, cache, weights)
 
-            gradients = back_propagation(y_batch, cache, weights, activation_derivative)
-
+            # Update parameters
             weights, biases = update_parameters(weights, biases, gradients, learning_rate)
 
-        if epoch % 1 == 0 or epoch == 1:
+        # Compute loss after each epoch
+        aL_full, _ = forward_propagation(x_train, weights, biases)
+        loss = compute_loss(aL_full, y_train)
+        loss_history.append(loss)
 
-            aL_full, _ = forward_propagation(x_train, weights, biases, activation_func)
-            loss = compute_loss(aL_full, y_train)
+        # Compute accuracy
+        if x_val is not None and y_val is not None:
+            # Validation accuracy
+            y_pred_val = predict(x_val, weights, biases)
+            accuracy = compute_accuracy(y_val, y_pred_val)
+            accuracy_history.append(accuracy)
+            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss:.4f}, Validation Accuracy: {accuracy:.2f}%")
+        else:
+            # Training accuracy
+            y_pred_train = predict(x_train, weights, biases)
+            accuracy = compute_accuracy(y_train, y_pred_train)
+            accuracy_history.append(accuracy)
+            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss:.4f}, Training Accuracy: {accuracy:.2f}%")
 
-            print(f"Epoch {epoch}/{num_epochs}, Loss: {loss:.4f}")
-
-    return weights, biases
+    return weights, biases, loss_history, accuracy_history
 
 # Evaluate Model
-def evaluate_model(x_test, y_test, weights, biases, activation_func):
+def evaluate_model(x_test, y_test, weights, biases):
 
-    aL, _ = forward_propagation(x_test, weights, biases, activation_func)
+    aL, _ = forward_propagation(x_test, weights, biases)
 
     y_pred = np.argmax(aL, axis=0)
 
@@ -215,14 +248,13 @@ def main():
 
     # Train the neural network
     print("Starting training...")
-    weights, biases = train_neural_network(
-        x_train, y_train, weights, biases, learning_rate, num_epochs,
-        activation_function, activation_function_derivative, batch_size=16
+    weights, biases, loss_history, accuracy_history = train_neural_network(
+        x_train, y_train, weights, biases, learning_rate, num_epochs, batch_size=64
     )
     print("Training completed.")
 
     # Evaluate the model
-    test_accuracy = evaluate_model(x_test, y_test, weights, biases, activation_function)
+    test_accuracy = evaluate_model(x_test, y_test, weights, biases)
     print(f"Test Accuracy: {test_accuracy:.2f}%")
 
 if __name__ == "__main__":
